@@ -1,0 +1,118 @@
+#This is a simple Kaggle Kernel I was creating on the side. This was mroe focused on data visuals
+#than the model as the coefficients are clearly off.
+#The link the the Kaggle dataset is below
+# https://www.kaggle.com/harlfoxem/housesalesprediction
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from scipy.stats import norm
+from sklearn.preprocessing import StandardScaler
+from scipy import stats
+from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression, RidgeCV, LassoCV, ElasticNetCV
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+
+
+
+#Load csv file to pandas
+#Need to replace path to saved file location
+train = pd.read_csv('C:/Users/metzn/Documents/Learn/kc_house_data.csv')
+
+#Quick look at data and summary statistics
+train.head()
+train.describe()
+
+#Living Area and Price XY Scatter
+var = 'sqft_living'
+data = pd.concat([train['price'], train[var]], axis=1)
+plot1=data.plot.scatter(x=var, y='price' )
+plot1.axes.set_title('Price and SqFt Living Area')
+plot1.set_xlabel("Square Ft Living Area")
+plot1.set_ylabel("Price")
+sns.plt.show()
+
+#correlation matrix
+corrmat = train.corr()
+f, ax = plt.subplots(figsize=(12, 12))
+plot2 =sns.heatmap(corrmat, vmax=.8);
+plt.xticks(rotation=90)
+plt.yticks(rotation=45)
+plot2.axes.set_title('Correlation Heat Map')
+sns.plt.show()
+
+
+#price correlation matrix
+cmap1 = sns.cubehelix_palette(as_cmap=True)
+k = 10 #number of variables for heatmap
+cols = corrmat.nlargest(k, 'price')['price'].index
+cm = np.corrcoef(train[cols].values.T)
+sns.set(font_scale=1.25)
+hm = sns.heatmap(cm, cbar=True, annot=True,cmap=cmap1, square=True, annot_kws={'size': 10}, yticklabels=cols.values, xticklabels=cols.values)
+hm.axes.set_title('Correlation Matrix')
+plt.xticks(rotation=90)
+plt.yticks(rotation=45)
+plt.show()
+
+
+#histogram and normal probability plot
+dist=sns.distplot(train['price'], fit=norm)
+dist.axes.set_title('Home Price Dist vs. Normal Dist')
+dist.set_xlabel("Home Price")
+sns.plt.show()
+
+#applying log transformation
+train['log_price'] = np.log(train['price'])
+
+#Re-examine log_price distribution
+dist=sns.distplot(train['log_price'], fit=norm)
+dist.axes.set_title('Home Price Dist vs. Normal Dist')
+dist.set_xlabel("Home Price")
+sns.plt.show()
+
+#Massaging Data
+#Drop non needed columns 
+train = train.drop(['zipcode', 'lat','long','sqft_living15','sqft_lot15','id','date','price'], axis=1)
+
+#Create Dummy variable(0,1) for renovated
+train['renovated']=0
+train.loc[train['yr_renovated'] > 0, 'renovated'] = 1
+train = train.drop(['yr_renovated'], axis=1)
+
+#Quick Regression model and look at coefficients
+x_train = train.drop("log_price", axis=1)
+y_train = train['log_price']
+lr = LinearRegression()
+lr.fit(x_train, y_train)
+
+#Plot Coefficients
+coefs = pd.Series(lr.coef_, index = x_train.columns)
+coefs.plot(kind = "barh")
+plt.title("Coefficients in the Linear Regression Model")
+plt.show()
+
+
+#Ridge
+ridge = RidgeCV(alphas = [0.01, 0.03, 0.06, 0.1, 0.3, 0.6, 1, 3, 6, 10, 30, 60])
+ridge.fit(x_train, y_train)
+alpha = ridge.alpha_
+#Plot Ridgecoefs2 = pd.Series(ridge.coef_, index = x_train.columns)
+coefs2 = pd.Series(ridge.coef_, index = x_train.columns)
+coefs2.plot(kind = "barh")
+plt.title("Coefficients in the Ridge Model")
+plt.show()
+
+
+# 3* Lasso
+lasso = LassoCV(alphas = [0.0001, 0.0003, 0.0006, 0.001, 0.003, 0.006, 0.01, 0.03, 0.06, 0.1, 
+                          0.3, 0.6, 1], 
+                max_iter = 50000, cv = 10)
+lasso.fit(x_train, y_train)
+alpha = lasso.alpha_
+
+coefs3 = pd.Series(lasso.coef_, index = x_train.columns)
+coefs3.plot(kind = "barh")
+plt.title("Coefficients in the Lasso Model")
+plt.show()
